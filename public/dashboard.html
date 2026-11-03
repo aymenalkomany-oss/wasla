@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التاجر - WASLA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f8f9fa; }
+        .brand-navy { background-color: #0B192C; color: white; }
+        .brand-gold { background-color: #D4AF37; color: white; }
+    </style>
+</head>
+<body class="pb-10">
+    <header class="brand-navy p-4 flex justify-between items-center mb-6">
+        <h1 class="text-xl font-bold">لوحة التاجر</h1>
+        <a href="/" class="text-sm bg-white text-brand-navy px-3 py-1 rounded">عودة للمتجر</a>
+    </header>
+
+    <main class="p-4 max-w-2xl mx-auto space-y-6">
+        <div id="store-info" class="bg-white p-4 rounded-xl shadow-sm border-r-4 border-brand-gold hidden">
+            <h2 class="font-bold text-lg text-brand-navy" id="store-name"></h2>
+        </div>
+
+        <!-- Add Product Form -->
+        <div class="bg-white p-4 rounded-xl shadow-sm">
+            <h2 class="font-bold text-lg text-brand-navy mb-4">إضافة منتج جديد</h2>
+            <input id="prod-name" type="text" placeholder="اسم المنتج" class="w-full border p-2 rounded mb-2 text-right">
+            <input id="prod-price" type="number" placeholder="السعر (ريال)" class="w-full border p-2 rounded mb-2 text-right">
+            <input id="prod-stock" type="number" placeholder="الكمية المتوفرة" class="w-full border p-2 rounded mb-2 text-right">
+            <select id="prod-category" class="w-full border p-2 rounded mb-4 text-right"></select>
+            <button onclick="addProduct()" class="w-full brand-navy py-2 rounded font-bold">إضافة المنتج للمتجر</button>
+        </div>
+    </main>
+
+    <script>
+        const token = localStorage.getItem('wasla_token');
+        if (!token) { alert('الرجاء تسجيل الدخول من الصفحة الرئيسية أولاً'); window.location.href = '/'; }
+
+        let storeId = null;
+
+        async function init() {
+            // 1. جلب بيانات المتجر
+            const storeRes = await fetch('/api/merchant/my-store', { headers: { 'Authorization': 'Bearer ' + token } });
+            if (storeRes.ok) {
+                const storeData = await storeRes.json();
+                storeId = storeData.store.id;
+                document.getElementById('store-info').classList.remove('hidden');
+                document.getElementById('store-name').innerText = storeData.store.name;
+            } else {
+                alert('هذا الحساب ليس لديه متجر. (استخدم حساب التاجر)');
+            }
+
+            // 2. جلب التصنيفات
+            const catRes = await fetch('/api/categories');
+            const catData = await catRes.json();
+            document.getElementById('prod-category').innerHTML = catData.categories.map(c => 
+                `<option value="${c.id}">${c.name}</option>`
+            ).join('');
+        }
+
+        async function addProduct() {
+            if (!storeId) return alert('لا يوجد متجر مرتبط بحسابك');
+            const body = {
+                storeId: storeId,
+                categoryId: document.getElementById('prod-category').value,
+                name: document.getElementById('prod-name').value,
+                price: document.getElementById('prod-price').value,
+                stockQuantity: document.getElementById('prod-stock').value
+            };
+            
+            const res = await fetch('/api/products', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert('✅ تم إضافة المنتج بنجاح! يمكنك رؤيته في الصفحة الرئيسية.');
+                document.getElementById('prod-name').value = '';
+                document.getElementById('prod-price').value = '';
+                document.getElementById('prod-stock').value = '';
+            } else { alert(data.error.message); }
+        }
+
+        init();
+    </script>
+</body>
+</html>

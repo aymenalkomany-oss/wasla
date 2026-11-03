@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASLA - وصلة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f8f9fa; }
+        .brand-navy { background-color: #0B192C; color: white; }
+        .brand-gold { background-color: #D4AF37; color: white; }
+        .text-brand-gold { color: #D4AF37; }
+        .text-brand-navy { color: #0B192C; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+    </style>
+</head>
+<body class="pb-10">
+    <header class="brand-navy sticky top-0 z-40 p-4 shadow-md flex justify-between items-center">
+        <div>
+            <a href="/" class="text-2xl font-bold tracking-wider">WASLA <span class="text-brand-gold">وصلة</span></a>
+            <p class="text-xs text-gray-300">كل الأسواق.. في وصلة واحدة</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="toggleModal('login-modal')" class="bg-white text-brand-navy px-3 py-1.5 rounded-lg font-bold text-sm">دخول</button>
+            <a href="/dashboard.html" class="brand-gold px-3 py-1.5 rounded-lg font-bold text-sm">لوحة التاجر</a>
+            <button onclick="toggleCart()" class="relative bg-white text-brand-navy p-2 rounded-full font-bold">
+                🛒 <span id="cart-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5">0</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="p-4 max-w-4xl mx-auto">
+        <h2 class="text-xl font-bold text-brand-navy mb-4">أحدث المنتجات</h2>
+        <div id="products-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+    </main>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="bg-white p-6 rounded-xl w-11/12 max-w-sm">
+            <h3 class="text-xl font-bold text-brand-navy mb-4 text-center">تسجيل الدخول</h3>
+            <input id="login-email" type="email" placeholder="البريد الإلكتروني" class="w-full border p-2 rounded mb-3 text-right">
+            <input id="login-password" type="password" placeholder="كلمة المرور" class="w-full border p-2 rounded mb-4 text-right">
+            <button onclick="login()" class="w-full brand-navy py-2 rounded font-bold mb-2">دخول</button>
+            <p class="text-xs text-center text-gray-500">ليس لديك حساب؟ <a href="#" onclick="toggleModal('login-modal'); toggleModal('register-modal');" class="text-brand-gold font-bold">أنشئ حساباً</a></p>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="register-modal" class="modal">
+        <div class="bg-white p-6 rounded-xl w-11/12 max-w-sm">
+            <h3 class="text-xl font-bold text-brand-navy mb-4 text-center">حساب جديد</h3>
+            <input id="reg-name" type="text" placeholder="الاسم الكامل" class="w-full border p-2 rounded mb-2 text-right">
+            <input id="reg-email" type="email" placeholder="البريد الإلكتروني" class="w-full border p-2 rounded mb-2 text-right">
+            <input id="reg-phone" type="text" placeholder="رقم الهاتف" class="w-full border p-2 rounded mb-2 text-right">
+            <input id="reg-password" type="password" placeholder="كلمة المرور" class="w-full border p-2 rounded mb-4 text-right">
+            <button onclick="register()" class="w-full brand-gold py-2 rounded font-bold mb-2 text-brand-navy">إنشاء الحساب</button>
+        </div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div id="cart-modal" class="modal">
+        <div class="bg-white p-6 rounded-t-2xl w-full max-w-sm mt-auto">
+            <div class="flex justify-between mb-4">
+                <h3 class="text-lg font-bold text-brand-navy">سلة التسوق</h3>
+                <button onclick="toggleCart()" class="text-red-500 font-bold text-xl">×</button>
+            </div>
+            <div id="cart-items" class="space-y-3 mb-6"></div>
+            
+            <!-- حقول التوصيل الجديدة -->
+            <input id="ship-address" type="text" placeholder="عنوان التوصيل (المدينة، الشارع)" class="w-full border p-2 rounded mb-2 text-right text-sm">
+            <input id="ship-phone" type="text" placeholder="رقم هاتف المستلم" class="w-full border p-2 rounded mb-4 text-right text-sm">
+            
+            <button onclick="checkout()" class="w-full brand-gold py-3 rounded-lg font-bold text-lg text-brand-navy">تأكيد الطلب (الدفع عند الاستلام)</button>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('wasla_token');
+
+        async function loadProducts() {
+            const res = await fetch('/api/products');
+            const data = await res.json();
+            const grid = document.getElementById('products-grid');
+            if (!data.products || data.products.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center py-10 text-gray-500">لا توجد منتجات</div>';
+                return;
+            }
+            grid.innerHTML = data.products.map(p => `
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 flex flex-col">
+                    <div class="h-32 bg-gray-200 flex items-center justify-center text-gray-400">صورة المنتج</div>
+                    <div class="p-3 flex-1 flex flex-col justify-between">
+                        <div>
+                            <h3 class="font-bold text-brand-navy text-sm line-clamp-2">${p.name}</h3>
+                            <p class="text-brand-gold font-bold mt-2">${p.price} ريال</p>
+                        </div>
+                        <button onclick="addToCart('${p.id}')" class="mt-3 w-full brand-navy text-white py-1.5 rounded-md text-sm">أضف للسلة</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleModal(id) { document.getElementById(id).classList.toggle('active'); }
+
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const res = await fetch('/api/auth/login', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                localStorage.setItem('wasla_token', data.token);
+                token = data.token;
+                alert('تم تسجيل الدخول بنجاح!');
+                toggleModal('login-modal');
+            } else { alert(data.error.message); }
+        }
+
+        async function register() {
+            const body = {
+                fullName: document.getElementById('reg-name').value,
+                email: document.getElementById('reg-email').value,
+                phone: document.getElementById('reg-phone').value,
+                password: document.getElementById('reg-password').value
+            };
+            const res = await fetch('/api/auth/register', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                localStorage.setItem('wasla_token', data.token);
+                token = data.token;
+                alert('تم إنشاء الحساب بنجاح!');
+                toggleModal('register-modal');
+            } else { alert(data.error.message); }
+        }
+
+        async function addToCart(productId) {
+            if (!token) { alert('الرجاء تسجيل الدخول أولاً'); return toggleModal('login-modal'); }
+            const res = await fetch('/api/cart', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ productId, quantity: 1 })
+            });
+            const data = await res.json();
+            if (res.ok) { alert('تمت الإضافة!'); updateCartCount(); } else { alert(data.error.message); }
+        }
+
+        async function updateCartCount() {
+            if (!token) return;
+            const res = await fetch('/api/cart', { headers: { 'Authorization': 'Bearer ' + token } });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('cart-count').innerText = data.cart.length;
+                document.getElementById('cart-items').innerHTML = data.cart.map(item => `
+                    <div class="flex justify-between items-center border-b pb-2">
+                        <div><p class="font-bold text-sm">${item.product.name}</p><p class="text-xs text-gray-500">الكمية: ${item.quantity}</p></div>
+                        <p class="text-brand-gold font-bold text-sm">${item.product.price} ريال</p>
+                    </div>
+                `).join('') || '<p class="text-gray-500 text-center">السلة فارغة</p>';
+            }
+        }
+
+        function toggleCart() { document.getElementById('cart-modal').classList.toggle('active'); updateCartCount(); }
+
+        async function checkout() {
+            if (!token) return alert('سجل الدخول أولاً');
+            const address = document.getElementById('ship-address').value;
+            const phone = document.getElementById('ship-phone').value;
+            
+            if (!address || !phone) return alert('الرجاء إدخال عنوان التوصيل ورقم الهاتف');
+            
+            const res = await fetch('/api/orders/checkout', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ shippingAddress: address, phone: phone })
+            });
+            const data = await res.json();
+            if (res.ok) { 
+                alert('🎉 تم الطلب بنجاح! سيتم التواصل معك للتوصيل.'); 
+                toggleCart(); 
+                updateCartCount(); 
+            } else { 
+                alert(data.error.message); 
+            }
+        }
+
+        loadProducts();
+        updateCartCount();
+    </script>
+</body>
+</html>
